@@ -88,7 +88,7 @@ print_file(FILE *fp) {
 					 isxdigit(buf[i+4]) &&
 					 isxdigit(buf[i+5]) &&
 					 isxdigit(buf[i+6]) &&
-					 !isxdigit(buf[i+7]))) {
+					 !isalnum(buf[i+7]))) {
 				print_six_digit_hex_color(&buf[i]);
 				printf("\033[0m");
 				i += 6;
@@ -101,7 +101,7 @@ print_file(FILE *fp) {
 					 isxdigit(buf[i+6]) &&
 					 isxdigit(buf[i+7]) &&
 					 isxdigit(buf[i+8]) &&
-					 !isxdigit(buf[i+9]))) {
+					 !isalnum(buf[i+9]))) {
 				print_six_digit_hex_color(&buf[i]);
 				printf("%c%c\033[0m", buf[i+7], buf[i+8]);
 				i += 8;
@@ -109,7 +109,7 @@ print_file(FILE *fp) {
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
 					 isxdigit(buf[i+3]) &&
-					 !isxdigit(buf[i+4]))) {
+					 !isalnum(buf[i+4]))) {
 				print_three_digit_hex_color(&buf[i]);
 				printf("\033[0m");
 				i += 3;
