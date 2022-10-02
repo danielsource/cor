@@ -10,6 +10,6 @@ about
 Concatenate files like the [cat command][1] and highlight [hex
 triplets colors][2] with [ANSI escape codes][3] when using [TrueColor
 supported terminal emulators][4]. Inspired by a more complete Vim plugin
-[vim-css-color][5].
+[vim-css-color][5]. Just out of curiosity: 'cor' means color in Portuguese.
 
 _NOTE: This program was not tested enough._
