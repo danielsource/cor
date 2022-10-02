@@ -125,6 +125,10 @@ main(int argc, char **argv) {
 	FILE *fp;
 	int status = 0, i;
 	for (i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-") == 0) {
+			print_file(stdin);
+			continue;
+		}
 		fp = fopen(argv[i], "r+");
 		if (!fp) {
 			fprintf(stderr, PROGRAM_NAME ": %s: %s.\n",
