@@ -38,9 +38,9 @@ print_six_digit_hex_color(char *buf) {
 	color[6] = '\0';
 	int_to_rgb(&rgb, strtol(color, NULL, 16));
 	if (is_color_dark(rgb))
-		printf("\033[38;2;0;0;0m");
+		fputs("\033[38;2;0;0;0m", stdout);
 	else
-		printf("\033[38;2;255;255;255m");
+		fputs("\033[38;2;255;255;255m", stdout);
 	printf("\033[48;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
 	putchar(*buf);
 	putchar(buf[1]);
@@ -64,9 +64,9 @@ print_three_digit_hex_color(char *buf) {
 	color[6] = '\0';
 	int_to_rgb(&rgb, strtol(color, NULL, 16));
 	if (is_color_dark(rgb))
-		printf("\033[38;2;0;0;0m");
+		fputs("\033[38;2;0;0;0m", stdout);
 	else
-		printf("\033[38;2;255;255;255m");
+		fputs("\033[38;2;255;255;255m", stdout);
 	printf("\033[48;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
 	putchar(*buf);
 	putchar(buf[1]);
@@ -74,14 +74,14 @@ print_three_digit_hex_color(char *buf) {
 	putchar(buf[3]);
 }
 
-static void
+static int
 print_file_with_colors(FILE *fp) {
-	const int bufsize = 4096;
+	const int bufsize = BUFSIZ;
 	char buf[bufsize];
-	int i;
-	while (fgets(buf, bufsize, fp) != NULL) {
-		for (i = 0; buf[i]; i++) {
-			if (i < bufsize-7 && buf[i] == '#' &&
+	size_t n, i;
+	while ((n = fread(buf, sizeof (char), bufsize, fp))) {
+		for (i = 0; i < n; i++) {
+			if (i < n-7 && buf[i] == '#' &&
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
 					 isxdigit(buf[i+3]) &&
@@ -90,9 +90,9 @@ print_file_with_colors(FILE *fp) {
 					 isxdigit(buf[i+6]) &&
 					 !isalnum(buf[i+7]))) {
 				print_six_digit_hex_color(&buf[i]);
-				printf("\033[0m");
+				fputs("\033[0m", stdout);
 				i += 6;
-			} else if (i < bufsize-9 && buf[i] == '#' &&
+			} else if (i < n-9 && buf[i] == '#' &&
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
 					 isxdigit(buf[i+3]) &&
@@ -103,42 +103,46 @@ print_file_with_colors(FILE *fp) {
 					 isxdigit(buf[i+8]) &&
 					 !isalnum(buf[i+9]))) {
 				print_six_digit_hex_color(&buf[i]);
-				printf("%c%c\033[0m", buf[i+7], buf[i+8]);
+				printf("%c%c\033[0m", buf[i+7],
+						buf[i+8]);
 				i += 8;
-			} else if (i < bufsize-4 && buf[i] == '#' &&
+			} else if (i < n-4 && buf[i] == '#' &&
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
 					 isxdigit(buf[i+3]) &&
 					 !isalnum(buf[i+4]))) {
 				print_three_digit_hex_color(&buf[i]);
-				printf("\033[0m");
+				fputs("\033[0m", stdout);
 				i += 3;
 			} else {
 				putchar(buf[i]);
 			}
 		}
 	}
+	return 0;
 }
 
-static void
+static int
 print_file_with_no_colors(FILE *fp) {
-	const int bufsize = 4096;
+	const int bufsize = BUFSIZ;
 	char buf[bufsize];
-	while (fgets(buf, bufsize, fp) != NULL)
-		printf("%s", buf);
+	size_t n;
+	while ((n = fread(buf, sizeof (char), bufsize, fp)))
+		fwrite(buf, sizeof (char), n, stdout);
+	return 0;
 }
 
 int
 main(int argc, char **argv) {
 	FILE *fp;
-	void (*print_file)(FILE *fp) = print_file_with_colors;
+	int (*print_file)(FILE *fp) = print_file_with_colors;
 	char *no_color = getenv("NO_COLOR");
 	int status = 0, i;
-	if (no_color)
+	if (no_color && *no_color != '\0')
 		print_file = print_file_with_no_colors;
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-") == 0) {
-			print_file(stdin);
+			status = print_file(stdin);
 			continue;
 		}
 		fp = fopen(argv[i], "r");
@@ -148,7 +152,7 @@ main(int argc, char **argv) {
 			status = errno;
 			continue;
 		}
-		print_file(fp);
+		status = print_file(fp);
 		fclose(fp);
 	}
 	return status;
