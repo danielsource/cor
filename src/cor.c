@@ -141,7 +141,7 @@ main(int argc, char **argv) {
 			print_file(stdin);
 			continue;
 		}
-		fp = fopen(argv[i], "r+");
+		fp = fopen(argv[i], "r");
 		if (!fp) {
 			fprintf(stderr, PROGRAM_NAME ": %s: %s.\n",
 					argv[i], strerror(errno));
