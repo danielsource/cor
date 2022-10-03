@@ -7,6 +7,19 @@
 #include <string.h>
 
 #define PROGRAM_NAME "cor"
+#define PROGRAM_USAGE \
+	"Usage: " PROGRAM_NAME " [-c] [-h] [-n] [FILE]...\n\n" \
+	"  -c   disable colors\n" \
+	"  -h   show usage\n" \
+	"  -n   number lines\n" \
+	"\n" \
+	"When FILE is -, read standard input.\n" \
+	"\n" \
+	"A double dash (--) is used to signal that\n" \
+	"any remaining arguments are not options.\n"
+#define INVALID_OPTION_FMT \
+	PROGRAM_NAME ": invalid option -- '%s'.\n" \
+	"Try '" PROGRAM_NAME " -h' for more information.\n"
 
 typedef struct options {
 	bool no_color;
@@ -88,8 +101,10 @@ print_file(FILE *fp, Options o) {
 	size_t n, i;
 	while ((n = fread(buf, sizeof (char), bufsize, fp))) {
 		for (i = 0; i < n; i++) {
-			if (o.numbering && (i == 0 || (i > 0 && buf[i-1] == '\n')))
-				printf("%6ld\t", numbering++);
+			if (o.numbering &&
+					(i == 0 ||
+					 (i > 0 && buf[i-1] == '\n')))
+				printf("%6d\t", numbering++);
 			if (o.no_color) {
 				putchar(buf[i]);
 				continue;
@@ -147,8 +162,7 @@ main(int argc, char **argv) {
 				argv[i][1] == '\0'))
 			continue;
 		else if (argv[i][2] != '\0') {
-			fprintf(stderr, PROGRAM_NAME ": invalid option -- '%s'.\n",
-					argv[i]);
+			fprintf(stderr, INVALID_OPTION_FMT, argv[i]);
 			return 1;
 		}
 		switch (argv[i][1]) {
@@ -158,12 +172,14 @@ main(int argc, char **argv) {
 		case 'c':
 			o.no_color = true;
 			break;
+		case 'h':
+			fputs(PROGRAM_USAGE, stdout);
+			return 0;
 		case 'n':
 			o.numbering = true;
 			break;
 		default:
-			fprintf(stderr, PROGRAM_NAME ": invalid option -- '%s'.\n",
-					argv[i]);
+			fprintf(stderr, INVALID_OPTION_FMT, argv[i]);
 			return 1;
 		}
 		if (o.end_of_options)
@@ -173,7 +189,8 @@ main(int argc, char **argv) {
 		if (argv[i][0] == '-' && argv[i][1] == '\0') {
 			status |= print_file(stdin, o);
 			continue;
-		} else if ((!o.end_of_options || i < o.end_of_options) &&
+		} else if ((!o.end_of_options || i < o.end_of_options)
+				&&
 				argv[i][0] == '-')
 			continue;
 		else if ((i == o.end_of_options) &&
