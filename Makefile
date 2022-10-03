@@ -1,7 +1,7 @@
 CC      ?= gcc
 CFLAGS  ?= -Os -ffast-math -std=c99 -Wall -Wextra -Wpedantic
 LDFLAGS ?= -s -lm
-PREFIX = /usr/local
+PREFIX  ?= /usr/local
 
 program = $(notdir $(patsubst %/,%,$(CURDIR)))
 sources = $(wildcard src/*.c)
@@ -13,7 +13,7 @@ all: $(program)
 clean:
 	rm -f $(program) $(objects)
 
-install:
+install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f $(program) $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(program)
