@@ -8,14 +8,20 @@
 
 #define PROGRAM_NAME "cor"
 
-struct RGB {
+typedef struct options {
+	bool no_color;
+	bool numbering;
+	int end_of_options;
+} Options;
+
+typedef struct rgb {
 	unsigned char r;
 	unsigned char g;
 	unsigned char b;
-};
+} RGB;
 
 static bool
-is_color_dark(struct RGB rgb) {
+is_color_dark(RGB rgb) {
 	float hsp; /* HSP Equation from alienryderflex.com/hsp.html */
 	hsp = sqrtf(0.299f * (rgb.r * rgb.r) +
 			0.587f * (rgb.g * rgb.g) +
@@ -24,7 +30,7 @@ is_color_dark(struct RGB rgb) {
 }
 
 static void
-int_to_rgb(struct RGB *rgb, int i) {
+int_to_rgb(RGB *rgb, int i) {
 	rgb->r = i >> 16;
 	rgb->g = i >> 8 & 0xff;
 	rgb->b = i & 0xff;
@@ -32,7 +38,7 @@ int_to_rgb(struct RGB *rgb, int i) {
 
 static void
 print_six_digit_hex_color(char *buf) {
-	struct RGB rgb;
+	RGB rgb;
 	char color[7];
 	strncpy(color, &buf[1], 6);
 	color[6] = '\0';
@@ -53,7 +59,7 @@ print_six_digit_hex_color(char *buf) {
 
 static void
 print_three_digit_hex_color(char *buf) {
-	struct RGB rgb;
+	RGB rgb;
 	char color[7];
 	color[0] = buf[1];
 	color[1] = buf[1];
@@ -75,12 +81,19 @@ print_three_digit_hex_color(char *buf) {
 }
 
 static int
-print_file_with_colors(FILE *fp) {
+print_file(FILE *fp, Options o) {
+	static unsigned int numbering = 1;
 	const int bufsize = BUFSIZ;
 	char buf[bufsize];
 	size_t n, i;
 	while ((n = fread(buf, sizeof (char), bufsize, fp))) {
 		for (i = 0; i < n; i++) {
+			if (o.numbering && (i == 0 || (i > 0 && buf[i-1] == '\n')))
+				printf("%6ld\t", numbering++);
+			if (o.no_color) {
+				putchar(buf[i]);
+				continue;
+			}
 			if (i < n-7 && buf[i] == '#' &&
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
@@ -114,45 +127,66 @@ print_file_with_colors(FILE *fp) {
 				print_three_digit_hex_color(&buf[i]);
 				fputs("\033[0m", stdout);
 				i += 3;
-			} else {
+			} else
 				putchar(buf[i]);
-			}
 		}
 	}
-	return 0;
-}
-
-static int
-print_file_with_no_colors(FILE *fp) {
-	const int bufsize = BUFSIZ;
-	char buf[bufsize];
-	size_t n;
-	while ((n = fread(buf, sizeof (char), bufsize, fp)))
-		fwrite(buf, sizeof (char), n, stdout);
 	return 0;
 }
 
 int
 main(int argc, char **argv) {
 	FILE *fp;
-	int (*print_file)(FILE *fp) = print_file_with_colors;
+	Options o = {0};
 	char *no_color = getenv("NO_COLOR");
 	int status = 0, i;
 	if (no_color && *no_color != '\0')
-		print_file = print_file_with_no_colors;
+		o.no_color = true;
 	for (i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-") == 0) {
-			status = print_file(stdin);
+		if (argv[i][0] != '\0' && (argv[i][0] != '-' ||
+				argv[i][1] == '\0'))
 			continue;
+		else if (argv[i][2] != '\0') {
+			fprintf(stderr, PROGRAM_NAME ": invalid option -- '%s'.\n",
+					argv[i]);
+			return 1;
 		}
+		switch (argv[i][1]) {
+		case '-':
+			o.end_of_options = i;
+			break;
+		case 'c':
+			o.no_color = true;
+			break;
+		case 'n':
+			o.numbering = true;
+			break;
+		default:
+			fprintf(stderr, PROGRAM_NAME ": invalid option -- '%s'.\n",
+					argv[i]);
+			return 1;
+		}
+		if (o.end_of_options)
+			break;
+	}
+	for (i = 1; i < argc; i++) {
+		if (argv[i][0] == '-' && argv[i][1] == '\0') {
+			status |= print_file(stdin, o);
+			continue;
+		} else if ((!o.end_of_options || i < o.end_of_options) &&
+				argv[i][0] == '-')
+			continue;
+		else if ((i == o.end_of_options) &&
+				argv[i][0] == '-' && argv[i][0] == '-')
+			continue;
 		fp = fopen(argv[i], "r");
 		if (!fp) {
-			fprintf(stderr, PROGRAM_NAME ": %s: %s.\n",
+			fprintf(stderr, PROGRAM_NAME ": '%s': %s.\n",
 					argv[i], strerror(errno));
-			status = errno;
+			status |= errno;
 			continue;
 		}
-		status = print_file(fp);
+		status |= print_file(fp, o);
 		fclose(fp);
 	}
 	return status;
