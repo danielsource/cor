@@ -75,12 +75,12 @@ print_three_digit_hex_color(char *buf) {
 }
 
 static void
-print_file(FILE *fp) {
+print_file_with_colors(FILE *fp) {
 	const int bufsize = 4096;
 	char buf[bufsize];
 	int i;
 	while (fgets(buf, bufsize, fp) != NULL) {
-		for (i = 0; i < bufsize && buf[i]; i++) {
+		for (i = 0; buf[i]; i++) {
 			if (i < bufsize-7 && buf[i] == '#' &&
 					(isxdigit(buf[i+1]) &&
 					 isxdigit(buf[i+2]) &&
@@ -120,10 +120,22 @@ print_file(FILE *fp) {
 	}
 }
 
+static void
+print_file_with_no_colors(FILE *fp) {
+	const int bufsize = 4096;
+	char buf[bufsize];
+	while (fgets(buf, bufsize, fp) != NULL)
+		printf("%s", buf);
+}
+
 int
 main(int argc, char **argv) {
 	FILE *fp;
+	void (*print_file)(FILE *fp) = print_file_with_colors;
+	char *no_color = getenv("NO_COLOR");
 	int status = 0, i;
+	if (no_color)
+		print_file = print_file_with_no_colors;
 	for (i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-") == 0) {
 			print_file(stdin);
