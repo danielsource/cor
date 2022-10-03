@@ -1,4 +1,4 @@
-CC      ?= gcc
+CC      ?= cc
 CFLAGS  ?= -Os -ffast-math -std=c99 -Wall -Wextra -Wpedantic
 LDFLAGS ?= -s -lm
 PREFIX  ?= /usr/local
