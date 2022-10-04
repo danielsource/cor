@@ -12,4 +12,5 @@ triplets colors][2] with [ANSI escape codes][3] when using [TrueColor
 supported terminal emulators][4]. Inspired by a more complete Vim plugin
 [vim-css-color][5]. Just out of curiosity: 'cor' means color in Portuguese.
 
-_NOTE: This program was not tested enough._
+_NOTE: This program has not been tested enough and does not display RGB 
+values, HSL values and CSS color names, but only HEX values at the moment._
