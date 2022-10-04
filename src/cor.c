@@ -7,19 +7,6 @@
 #include <string.h>
 
 #define PROGRAM_NAME "cor"
-#define PROGRAM_USAGE \
-	"Usage: " PROGRAM_NAME " [-c] [-h] [-n] [FILE]...\n\n" \
-	"  -c   disable colors\n" \
-	"  -h   show usage\n" \
-	"  -n   number lines\n" \
-	"\n" \
-	"When FILE is -, read standard input.\n" \
-	"\n" \
-	"A double dash (--) is used to signal that\n" \
-	"any remaining arguments are not options.\n"
-#define INVALID_OPTION_FMT \
-	PROGRAM_NAME ": invalid option -- '%s'.\n" \
-	"Try '" PROGRAM_NAME " -h' for more information.\n"
 
 typedef struct options {
 	bool no_color;
@@ -32,6 +19,23 @@ typedef struct rgb {
 	unsigned char g;
 	unsigned char b;
 } RGB;
+
+static const char *program_usage =
+"Usage: " PROGRAM_NAME " [-c] [-h] [-n] [FILE]...\n"
+"\n"
+"  -c   disable colors\n"
+"  -h   show usage\n"
+"  -n   number lines\n"
+"\n"
+"When no FILE, or when FILE is -, read\n"
+"standard input.\n"
+"\n"
+"A double dash (--) is used to signal that\n"
+"any remaining arguments are not options.\n";
+
+static const char *invalid_option_fmt =
+PROGRAM_NAME ": invalid option -- '%s'.\n"
+"Try '" PROGRAM_NAME " -h' for more information.\n";
 
 static bool
 is_color_dark(RGB rgb) {
@@ -155,14 +159,17 @@ main(int argc, char **argv) {
 	Options o = {0};
 	char *no_color = getenv("NO_COLOR");
 	int status = 0, i;
+	bool found_file_arg = false;
 	if (no_color && *no_color != '\0')
 		o.no_color = true;
 	for (i = 1; i < argc; i++) {
-		if (argv[i][0] != '\0' && (argv[i][0] != '-' ||
-				argv[i][1] == '\0'))
+		if (argv[i][0] == '\0' || (argv[i][0] != '\0' &&
+				(argv[i][0] != '-' ||
+				 argv[i][1] == '\0'))) {
+			found_file_arg = true;
 			continue;
-		else if (argv[i][2] != '\0') {
-			fprintf(stderr, INVALID_OPTION_FMT, argv[i]);
+		} else if (argv[i][2] != '\0') {
+			fprintf(stderr, invalid_option_fmt, argv[i]);
 			return 1;
 		}
 		switch (argv[i][1]) {
@@ -173,18 +180,21 @@ main(int argc, char **argv) {
 			o.no_color = true;
 			break;
 		case 'h':
-			fputs(PROGRAM_USAGE, stdout);
+			fputs(program_usage, stdout);
 			return 0;
 		case 'n':
 			o.numbering = true;
 			break;
 		default:
-			fprintf(stderr, INVALID_OPTION_FMT, argv[i]);
+			fprintf(stderr, invalid_option_fmt, argv[i]);
 			return 1;
 		}
 		if (o.end_of_options)
 			break;
 	}
+	if ((!o.end_of_options || o.end_of_options == argc - 1) &&
+			!found_file_arg)
+		return print_file(stdin, o);
 	for (i = 1; i < argc; i++) {
 		if (argv[i][0] == '-' && argv[i][1] == '\0') {
 			status |= print_file(stdin, o);
