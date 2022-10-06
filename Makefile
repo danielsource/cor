@@ -1,9 +1,5 @@
-CC      ?= cc
-CFLAGS  ?= -Os -ffast-math -std=c99 -Wall -Wextra -Wpedantic
-LDFLAGS ?= -s -lm
-PREFIX  ?= /usr/local
+include config.mk
 
-program = $(notdir $(patsubst %/,%,$(CURDIR)))
 sources = $(wildcard src/*.c)
 headers = $(wildcard src/*.h)
 objects = $(sources:.c=.o)
@@ -12,6 +8,10 @@ all: $(program)
 
 clean:
 	rm -f $(program) $(objects)
+
+debug: CFLAGS = -g -O0 -std=c99 -Wall -Wextra -Wpedantic
+debug: LDFLAGS = -lm
+debug: all
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
@@ -25,6 +25,8 @@ $(program): $(objects)
 	$(CC) -o $@ $(objects) $(LDFLAGS)
 
 src/%.o: src/%.c $(headers)
-	$(CC) -o $@ -c $(CFLAGS) $<
+	$(CC) -o $@ -c $(CFLAGS) \
+		-DPROGRAM_NAME=\"$(program)\" \
+		-DPROGRAM_VERSION=\"$(version)\" $<
 
-.PHONY: all clean install uninstall
+.PHONY: all clean debug install uninstall

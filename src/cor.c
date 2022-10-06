@@ -6,7 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef PROGRAM_NAME
 #define PROGRAM_NAME "cor"
+#endif
+
+#ifndef PROGRAM_VERSION
+#define PROGRAM_VERSION "dev"
+#endif
 
 typedef struct options {
 	bool no_color;
@@ -21,11 +27,14 @@ typedef struct rgb {
 } RGB;
 
 static const char *program_usage =
-"Usage: " PROGRAM_NAME " [-c] [-h] [-n] [FILE]...\n"
+"Usage: " PROGRAM_NAME " [OPTION]... [FILE]...\n"
+"Concatenate FILE(s) to standard output and\n"
+"preview the hexadecimal colors.\n"
 "\n"
-"  -c   disable colors\n"
-"  -h   show usage\n"
-"  -n   number lines\n"
+"  -c             disable colors\n"
+"  -h, --help     show this help\n"
+"  -n             number lines\n"
+"  -v, --version  show version information\n"
 "\n"
 "When no FILE, or when FILE is -, read\n"
 "standard input.\n"
@@ -34,8 +43,23 @@ static const char *program_usage =
 "any remaining arguments are not options.\n";
 
 static const char *invalid_option_fmt =
-PROGRAM_NAME ": invalid option -- '%s'.\n"
+PROGRAM_NAME ": invalid option -- '%c'.\n"
 "Try '" PROGRAM_NAME " -h' for more information.\n";
+
+static const char *unreconized_option_fmt =
+PROGRAM_NAME ": unreconized option '%s'.\n"
+"Try '" PROGRAM_NAME " -h' for more information.\n";
+
+static void
+show_help() {
+	fputs(program_usage, stdout);
+}
+
+static void
+show_version() {
+	fputs(PROGRAM_NAME "-" PROGRAM_VERSION "\n",
+			stdout);
+}
 
 static bool
 is_color_dark(RGB rgb) {
@@ -158,7 +182,7 @@ main(int argc, char **argv) {
 	FILE *fp;
 	Options o = {0};
 	char *no_color = getenv("NO_COLOR");
-	int status = 0, i;
+	int status = 0, i, j;
 	bool found_file_arg = false;
 	if (no_color && *no_color != '\0')
 		o.no_color = true;
@@ -168,29 +192,39 @@ main(int argc, char **argv) {
 				 argv[i][1] == '\0'))) {
 			found_file_arg = true;
 			continue;
-		} else if (argv[i][2] != '\0') {
-			fprintf(stderr, invalid_option_fmt, argv[i]);
-			return 1;
-		}
-		switch (argv[i][1]) {
-		case '-':
+		} else if (strcmp(argv[i], "--") == 0) {
 			o.end_of_options = i;
 			break;
-		case 'c':
-			o.no_color = true;
-			break;
-		case 'h':
-			fputs(program_usage, stdout);
+		} else if (strcmp(argv[i], "--help") == 0) {
+			show_help();
 			return 0;
-		case 'n':
-			o.numbering = true;
-			break;
-		default:
-			fprintf(stderr, invalid_option_fmt, argv[i]);
+		} else if (strcmp(argv[i], "--version") == 0) {
+			show_version();
+			return 0;
+		} else if (argv[i][1] == '-') {
+			fprintf(stderr, unreconized_option_fmt,
+					argv[i]);
 			return 1;
+		} else for (j = 1; argv[i][j]; j++) {
+			switch (argv[i][j]) {
+			case 'c':
+				o.no_color = true;
+				break;
+			case 'h':
+				show_help();
+				return 0;
+			case 'n':
+				o.numbering = true;
+				break;
+			case 'v':
+				show_version();
+				return 0;
+			default:
+				fprintf(stderr, invalid_option_fmt,
+						argv[i][j]);
+				return 1;
+			}
 		}
-		if (o.end_of_options)
-			break;
 	}
 	if ((!o.end_of_options || o.end_of_options == argc - 1) &&
 			!found_file_arg)
@@ -210,7 +244,7 @@ main(int argc, char **argv) {
 		if (!fp) {
 			fprintf(stderr, PROGRAM_NAME ": '%s': %s.\n",
 					argv[i], strerror(errno));
-			status |= errno;
+			status = 1;
 			continue;
 		}
 		status |= print_file(fp, o);
