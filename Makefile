@@ -19,7 +19,7 @@ install: all
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/$(program)
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/dwm
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(program)
 
 $(program): $(objects)
 	$(CC) -o $@ $(objects) $(LDFLAGS)
