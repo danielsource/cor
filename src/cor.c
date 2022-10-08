@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +17,7 @@
 
 typedef struct options {
 	bool no_color;
-	bool numbering;
+	bool number_lines;
 	int end_of_options;
 } Options;
 
@@ -47,18 +48,14 @@ PROGRAM_NAME ": invalid option -- '%c'.\n"
 "Try '" PROGRAM_NAME " -h' for more information.\n";
 
 static const char *unreconized_option_fmt =
-PROGRAM_NAME ": unreconized option '%s'.\n"
+PROGRAM_NAME ": unreconized option '--%s'.\n"
 "Try '" PROGRAM_NAME " -h' for more information.\n";
 
 static void
-show_help() {
-	fputs(program_usage, stdout);
-}
-
-static void
-show_version() {
-	fputs(PROGRAM_NAME "-" PROGRAM_VERSION "\n",
-			stdout);
+int_to_rgb(RGB *rgb, uint32_t i) {
+	rgb->r = i >> 16;
+	rgb->g = i >> 8 & 0xff;
+	rgb->b = i & 0xff;
 }
 
 static bool
@@ -68,13 +65,6 @@ is_color_dark(RGB rgb) {
 			0.587f * (rgb.g * rgb.g) +
 			0.114f * (rgb.b * rgb.b));
 	return hsp > 127.5f;
-}
-
-static void
-int_to_rgb(RGB *rgb, int i) {
-	rgb->r = i >> 16;
-	rgb->g = i >> 8 & 0xff;
-	rgb->b = i & 0xff;
 }
 
 static void
@@ -129,7 +119,7 @@ print_file(FILE *fp, Options o) {
 	size_t n, i;
 	while ((n = fread(buf, sizeof (char), bufsize, fp))) {
 		for (i = 0; i < n; i++) {
-			if (o.numbering &&
+			if (o.number_lines &&
 					(i == 0 ||
 					 (i > 0 && buf[i-1] == '\n')))
 				printf("%6d\t", numbering++);
@@ -177,6 +167,54 @@ print_file(FILE *fp, Options o) {
 	return 0;
 }
 
+static void
+show_help() {
+	fputs(program_usage, stdout);
+}
+
+static void
+show_version() {
+	fputs(PROGRAM_NAME "-" PROGRAM_VERSION "\n",
+			stdout);
+}
+
+static void
+handle_multi_char_option(char *arg) {
+	if (strncmp(arg, "help", 5) == 0) {
+		show_help();
+		exit(0);
+	} else if (strncmp(arg, "version", 8) == 0) {
+		show_version();
+		exit(0);
+	} else {
+		fprintf(stderr, unreconized_option_fmt,
+				arg);
+		exit(1);
+	}
+}
+
+static void
+handle_single_char_option(char option, Options *o) {
+	switch (option) {
+	case 'c':
+		o->no_color = true;
+		break;
+	case 'h':
+		show_help();
+		exit(0);
+	case 'n':
+		o->number_lines = true;
+		break;
+	case 'v':
+		show_version();
+		exit(0);
+	default:
+		fprintf(stderr, invalid_option_fmt,
+				option);
+		exit(1);
+	}
+}
+
 int
 main(int argc, char **argv) {
 	FILE *fp;
@@ -187,44 +225,18 @@ main(int argc, char **argv) {
 	if (no_color && *no_color != '\0')
 		o.no_color = true;
 	for (i = 1; i < argc; i++) {
-		if (argv[i][0] == '\0' || (argv[i][0] != '\0' &&
+		if (argv[i][0] == '\0' ||
 				(argv[i][0] != '-' ||
-				 argv[i][1] == '\0'))) {
+				 argv[i][1] == '\0')) {
 			found_file_arg = true;
 			continue;
-		} else if (strcmp(argv[i], "--") == 0) {
+		} else if (argv[i][1] == '-' && argv[i][2] == '\0') {
 			o.end_of_options = i;
 			break;
-		} else if (strcmp(argv[i], "--help") == 0) {
-			show_help();
-			return 0;
-		} else if (strcmp(argv[i], "--version") == 0) {
-			show_version();
-			return 0;
-		} else if (argv[i][1] == '-') {
-			fprintf(stderr, unreconized_option_fmt,
-					argv[i]);
-			return 1;
-		} else for (j = 1; argv[i][j]; j++) {
-			switch (argv[i][j]) {
-			case 'c':
-				o.no_color = true;
-				break;
-			case 'h':
-				show_help();
-				return 0;
-			case 'n':
-				o.numbering = true;
-				break;
-			case 'v':
-				show_version();
-				return 0;
-			default:
-				fprintf(stderr, invalid_option_fmt,
-						argv[i][j]);
-				return 1;
-			}
-		}
+		} else if (argv[i][1] == '-')
+			handle_multi_char_option(&argv[i][2]);
+		else for (j = 1; argv[i][j]; j++)
+			handle_single_char_option(argv[i][j], &o);
 	}
 	if ((!o.end_of_options || o.end_of_options == argc - 1) &&
 			!found_file_arg)
