@@ -9,8 +9,9 @@ all: $(program)
 clean:
 	rm -f $(program) $(objects)
 
-debug: CFLAGS = -g -O0 -std=c99 -Wall -Wextra -Wpedantic
-debug: LDFLAGS = -lm
+debug: CFLAGS  = -g -O0 -std=c99 -Wall -Wextra -Wpedantic -DDEBUG
+debug: LDFLAGS =
+debug: version := $(version)+debug
 debug: all
 
 install: all
