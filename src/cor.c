@@ -168,12 +168,12 @@ print_file(FILE *fp, Options o) {
 }
 
 static void
-show_help() {
+show_help(void) {
 	fputs(program_usage, stdout);
 }
 
 static void
-show_version() {
+show_version(void) {
 	fputs(PROGRAM_NAME "-" PROGRAM_VERSION "\n",
 			stdout);
 }
