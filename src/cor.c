@@ -1,266 +1,130 @@
-#include <ctype.h>
-#include <errno.h>
-#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef PROGRAM_NAME
-#define PROGRAM_NAME "cor"
-#endif
+#include "util.h"
 
-#ifndef PROGRAM_VERSION
-#define PROGRAM_VERSION "dev"
-#endif
+/* Argument flags */
+#define IS_OPTION_END  0x01
+#define IS_FILE        0x02
+#define IS_STDIN       0x04
+#define IS_CHAR_OPTION 0x08
+#define IS_STR_OPTION  0x10
 
-typedef struct options {
-	bool no_color;
-	bool number_lines;
-	int end_of_options;
-} Options;
+/* Option flags */
+#define READ_FILES      0x01
+#define NO_COLOR        0x02
+#define NUMBER_LINES    0x04
+#define SHOW_HELP       0x08
+#define SHOW_VERSION    0x10
+#define INVALID_OPTION  0x20
+#define NEGATIVE_OPTION 0x40
 
-typedef struct rgb {
-	unsigned char r;
-	unsigned char g;
-	unsigned char b;
-} RGB;
+typedef uint8_t ArgFlags;
+typedef uint8_t OptionFlags;
 
-static const char *program_usage =
-"Usage: " PROGRAM_NAME " [OPTION]... [FILE]...\n"
-"Concatenate FILE(s) to standard output and\n"
-"preview the hexadecimal colors.\n"
-"\n"
-"  -c             disable colors\n"
-"  -h, --help     show this help\n"
-"  -n             number lines\n"
-"  -v, --version  show version information\n"
-"\n"
-"When no FILE, or when FILE is -, read\n"
-"standard input.\n"
-"\n"
-"A double dash (--) is used to signal that\n"
-"any remaining arguments are not options.\n";
+typedef struct {
+    char c;
+    char *str;
+    OptionFlags flag;
+    char *description;
+} Option;
 
-static const char *invalid_option_fmt =
-PROGRAM_NAME ": invalid option -- '%c'.\n"
-"Try '" PROGRAM_NAME " -h' for more information.\n";
+static const Option options[] = {
+    {'c', "no-color", NO_COLOR,     "Disable color in output"},
+    {'n', "number",   NUMBER_LINES, "Number output lines"},
+    {'h', "help",     SHOW_HELP,    "Display this help"},
+    {'v', "version",  SHOW_VERSION, "Display version information"},
+};
 
-static const char *unreconized_option_fmt =
-PROGRAM_NAME ": unreconized option '--%s'.\n"
-"Try '" PROGRAM_NAME " -h' for more information.\n";
+static const char *usage = "Usage: cor [OPTION]... [--] [FILE]...\n";
 
-static void
-int_to_rgb(RGB *rgb, uint32_t i) {
-	rgb->r = i >> 16;
-	rgb->g = i >> 8 & 0xff;
-	rgb->b = i & 0xff;
-}
-
-static bool
-is_color_dark(RGB rgb) {
-	float hsp; /* HSP Equation from alienryderflex.com/hsp.html */
-	hsp = sqrtf(0.299f * (rgb.r * rgb.r) +
-			0.587f * (rgb.g * rgb.g) +
-			0.114f * (rgb.b * rgb.b));
-	return hsp > 127.5f;
-}
-
-static void
-print_six_digit_hex_color(char *buf) {
-	RGB rgb;
-	char color[7];
-	strncpy(color, &buf[1], 6);
-	color[6] = '\0';
-	int_to_rgb(&rgb, strtol(color, NULL, 16));
-	if (is_color_dark(rgb))
-		fputs("\033[38;2;0;0;0m", stdout);
-	else
-		fputs("\033[38;2;255;255;255m", stdout);
-	printf("\033[48;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
-	putchar(*buf);
-	putchar(buf[1]);
-	putchar(buf[2]);
-	putchar(buf[3]);
-	putchar(buf[4]);
-	putchar(buf[5]);
-	putchar(buf[6]);
-}
-
-static void
-print_three_digit_hex_color(char *buf) {
-	RGB rgb;
-	char color[7];
-	color[0] = buf[1];
-	color[1] = buf[1];
-	color[2] = buf[2];
-	color[3] = buf[2];
-	color[4] = buf[3];
-	color[5] = buf[3];
-	color[6] = '\0';
-	int_to_rgb(&rgb, strtol(color, NULL, 16));
-	if (is_color_dark(rgb))
-		fputs("\033[38;2;0;0;0m", stdout);
-	else
-		fputs("\033[38;2;255;255;255m", stdout);
-	printf("\033[48;2;%d;%d;%dm", rgb.r, rgb.g, rgb.b);
-	putchar(*buf);
-	putchar(buf[1]);
-	putchar(buf[2]);
-	putchar(buf[3]);
-}
-
-static int
-print_file(FILE *fp, Options o) {
-	static unsigned int numbering = 1;
-	const int bufsize = BUFSIZ;
-	char buf[bufsize];
-	size_t n, i;
-	while ((n = fread(buf, sizeof (char), bufsize, fp))) {
-		for (i = 0; i < n; i++) {
-			if (o.number_lines &&
-					(i == 0 ||
-					 (i > 0 && buf[i-1] == '\n')))
-				printf("%6d\t", numbering++);
-			if (o.no_color) {
-				putchar(buf[i]);
-				continue;
-			}
-			if (i < n-7 && buf[i] == '#' &&
-					(isxdigit(buf[i+1]) &&
-					 isxdigit(buf[i+2]) &&
-					 isxdigit(buf[i+3]) &&
-					 isxdigit(buf[i+4]) &&
-					 isxdigit(buf[i+5]) &&
-					 isxdigit(buf[i+6]) &&
-					 !isalnum(buf[i+7]))) {
-				print_six_digit_hex_color(&buf[i]);
-				fputs("\033[0m", stdout);
-				i += 6;
-			} else if (i < n-9 && buf[i] == '#' &&
-					(isxdigit(buf[i+1]) &&
-					 isxdigit(buf[i+2]) &&
-					 isxdigit(buf[i+3]) &&
-					 isxdigit(buf[i+4]) &&
-					 isxdigit(buf[i+5]) &&
-					 isxdigit(buf[i+6]) &&
-					 isxdigit(buf[i+7]) &&
-					 isxdigit(buf[i+8]) &&
-					 !isalnum(buf[i+9]))) {
-				print_six_digit_hex_color(&buf[i]);
-				printf("%c%c\033[0m", buf[i+7],
-						buf[i+8]);
-				i += 8;
-			} else if (i < n-4 && buf[i] == '#' &&
-					(isxdigit(buf[i+1]) &&
-					 isxdigit(buf[i+2]) &&
-					 isxdigit(buf[i+3]) &&
-					 !isalnum(buf[i+4]))) {
-				print_three_digit_hex_color(&buf[i]);
-				fputs("\033[0m", stdout);
-				i += 3;
-			} else
-				putchar(buf[i]);
-		}
-	}
-	return 0;
-}
-
-static void
-show_help(void) {
-	fputs(program_usage, stdout);
-}
-
-static void
-show_version(void) {
-	fputs(PROGRAM_NAME "-" PROGRAM_VERSION "\n",
-			stdout);
-}
-
-static void
-handle_multi_char_option(char *arg) {
-	if (strncmp(arg, "help", 5) == 0) {
-		show_help();
-		exit(0);
-	} else if (strncmp(arg, "version", 8) == 0) {
-		show_version();
-		exit(0);
-	} else {
-		fprintf(stderr, unreconized_option_fmt,
-				arg);
-		exit(1);
-	}
-}
-
-static void
-handle_single_char_option(char option, Options *o) {
-	switch (option) {
-	case 'c':
-		o->no_color = true;
-		break;
-	case 'h':
-		show_help();
-		exit(0);
-	case 'n':
-		o->number_lines = true;
-		break;
-	case 'v':
-		show_version();
-		exit(0);
-	default:
-		fprintf(stderr, invalid_option_fmt,
-				option);
-		exit(1);
-	}
+ArgFlags
+identify_arg(const char *arg) {
+    size_t len = strnlen(arg, 3);
+    if (len == 1 &&
+            arg[0] == '-')
+        return IS_STDIN;
+    else if (len == 2 &&
+            arg[0] == '-' &&
+            arg[1] == '-')
+        return IS_OPTION_END;
+    else if (len > 1 && arg[0] == '-' &&
+            arg[1] != '-')
+        return IS_CHAR_OPTION;
+    else if (len > 2 && arg[0] == '-' &&
+            arg[1] == '-')
+        return IS_STR_OPTION;
+    return IS_FILE;
 }
 
 int
 main(int argc, char **argv) {
-	FILE *fp;
-	Options o = {0};
-	char *no_color = getenv("NO_COLOR");
-	int status = 0, i, j;
-	bool found_file_arg = false;
-	if (no_color && *no_color != '\0')
-		o.no_color = true;
-	for (i = 1; i < argc; i++) {
-		if (argv[i][0] == '\0' ||
-				(argv[i][0] != '-' ||
-				 argv[i][1] == '\0')) {
-			found_file_arg = true;
-			continue;
-		} else if (argv[i][1] == '-' && argv[i][2] == '\0') {
-			o.end_of_options = i;
-			break;
-		} else if (argv[i][1] == '-')
-			handle_multi_char_option(&argv[i][2]);
-		else for (j = 1; argv[i][j]; j++)
-			handle_single_char_option(argv[i][j], &o);
-	}
-	if ((!o.end_of_options || o.end_of_options == argc - 1) &&
-			!found_file_arg)
-		return print_file(stdin, o);
-	for (i = 1; i < argc; i++) {
-		if (argv[i][0] == '-' && argv[i][1] == '\0') {
-			status |= print_file(stdin, o);
-			continue;
-		} else if ((!o.end_of_options || i < o.end_of_options)
-				&&
-				argv[i][0] == '-')
-			continue;
-		else if ((i == o.end_of_options) &&
-				argv[i][0] == '-' && argv[i][0] == '-')
-			continue;
-		fp = fopen(argv[i], "r");
-		if (!fp) {
-			fprintf(stderr, PROGRAM_NAME ": '%s': %s.\n",
-					argv[i], strerror(errno));
-			status = 1;
-			continue;
-		}
-		status |= print_file(fp, o);
-		fclose(fp);
-	}
-	return status;
+    ArgFlags *a;
+    OptionFlags o = 0;
+    char *no_color;
+    int i, exitcode = EXIT_SUCCESS;
+
+#ifdef DEBUG
+    set_trace_log_level(LOG_DEBUG);
+#endif
+
+    a = malloc(argc * sizeof(ArgFlags));
+    no_color = getenv("NO_COLOR");
+    if (no_color != NULL && no_color[0] != '\0') {
+        o |= NO_COLOR;
+    }
+
+    /* Handle [OPTION]... */
+    for (i = 1; i < argc; i++) {
+        a[i] = identify_arg(argv[i]);
+        if (a[i] & IS_OPTION_END) {
+            if (argc - i - 1 > 0) {
+                memset(a + i + 1, IS_FILE, argc - i - 1);
+                o |= READ_FILES;
+            }
+            break;
+        } else if (a[i] & (IS_FILE | IS_STDIN)) {
+            o |= READ_FILES;
+            continue;
+        } else if (a[i] & IS_CHAR_OPTION) {
+            trace_log(LOG_DEBUG, "Got the char option '%s'", argv[i]);
+            /* TODO: o = handle_char_option(argv[i] + 1, o); */
+        } else if (a[i] & IS_STR_OPTION) {
+            trace_log(LOG_DEBUG, "Got the string option '%s'", argv[i]);
+            /* TODO: o = handle_str_option(argv[i] + 2, o); */
+        }
+    }
+
+    if (o & INVALID_OPTION) {
+        exitcode = EXIT_FAILURE;
+        fputs(usage, stdout);
+    } else if (o & (SHOW_HELP|INVALID_OPTION)) {
+        fputs(usage, stdout);
+        goto finish;
+    } else if (o & SHOW_VERSION) {
+        puts("cor-prerelease");
+        goto finish;
+    }
+
+    /* Handle [FILE]... */
+    if (o ^ READ_FILES)
+        trace_log(LOG_DEBUG,
+                "Reading stdin because no file was provided");
+    else for (i = 1; i < argc; i++) {
+        if (a[i] & (IS_OPTION_END |
+                IS_CHAR_OPTION | IS_STR_OPTION))
+            continue;
+        else if (a[i] & IS_STDIN)
+            trace_log(LOG_DEBUG, "Reading stdin");
+        else if (a[i] & IS_FILE)
+            trace_log(LOG_DEBUG, "Reading '%s'", argv[i]);
+        /* TODO: read files and print them */
+    }
+
+finish:
+    free(a);
+    return exitcode;
 }
