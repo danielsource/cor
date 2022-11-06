@@ -6,7 +6,7 @@
 
 #include "util.h"
 
-static LogType log_level = LOG_INFO;
+static LogType g_log_level = LOG_INFO;
 
 void
 die(const char *fmt, ...) {
@@ -27,14 +27,14 @@ strnlen(const char *s, size_t maxlen) {
 
 void
 set_trace_log_level(LogType t) {
-    log_level = t;
+    g_log_level = t;
 }
 
 void
 trace_log(LogType t, const char *fmt, ...) {
     FILE *f = stdout;
     va_list args;
-    if (t < log_level)
+    if (t < g_log_level)
         return;
     va_start(args, fmt);
     switch (t) {

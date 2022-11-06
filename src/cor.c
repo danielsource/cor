@@ -32,14 +32,30 @@ typedef struct {
     char *description;
 } Option;
 
-static const Option options[] = {
+static const Option g_options[] = {
     {'c', "no-color", NO_COLOR,     "Disable color in output"},
     {'n', "number",   NUMBER_LINES, "Number output lines"},
     {'h', "help",     SHOW_HELP,    "Display this help"},
     {'v', "version",  SHOW_VERSION, "Display version information"},
 };
 
-static const char *usage = "Usage: cor [OPTION]... [--] [FILE]...\n";
+void show_help(FILE *f) {
+    int i;
+    fputs("Usage: cor [OPTION]... [--] [FILE]...\n"
+            "Preview colors when outputting files in the terminal.\n"
+            "\n"
+            "With no FILE, or when FILE is -, read standard input.\n"
+            "\n", f);
+    for (i = 0; i < LENGTH(g_options); i++)
+        fprintf(f, "  -%c, --%-*s%s\n",
+                g_options[i].c,
+                14,
+                g_options[i].str,
+                g_options[i].description);
+    fputs("\n"
+            "Inspired by the 'cat' Unix utility.\n"
+            "Program page: https://github.com/danielsource/cor\n", f);
+}
 
 ArgFlags
 identify_arg(const char *arg) {
@@ -58,6 +74,49 @@ identify_arg(const char *arg) {
             arg[1] == '-')
         return IS_STR_OPTION;
     return IS_FILE;
+}
+
+OptionFlags
+handle_char_option(char *options, OptionFlags o) {
+    int i, j;
+    bool valid;
+    for (i = 0; options[i]; i++) {
+        valid = false;
+        for (j = 0; j < LENGTH(g_options); j++) {
+            if (options[i] == g_options[j].c) {
+                if (g_options[j].flag & NEGATIVE_OPTION)
+                    o ^= g_options[j].flag;
+                else
+                    o |= g_options[j].flag;
+                valid = true;
+            }
+        }
+        if (!valid) {
+            fprintf(stderr, "cor: Invalid option '-%c'\n", options[i]);
+            o |= INVALID_OPTION;
+        }
+    }
+    return o;
+}
+
+OptionFlags
+handle_str_option(char *option, OptionFlags o) {
+    int i;
+    bool valid;
+    for (i = 0; i < LENGTH(g_options); i++) {
+        if (!strcmp(option, g_options[i].str)) {
+            if (g_options[i].flag & NEGATIVE_OPTION)
+                o ^= g_options[i].flag;
+            else
+                o |= g_options[i].flag;
+            valid = true;
+        }
+    }
+    if (!valid) {
+        fprintf(stderr, "cor: Invalid option '--%s'\n", option);
+        o |= INVALID_OPTION;
+    }
+    return o;
 }
 
 int
@@ -91,18 +150,18 @@ main(int argc, char **argv) {
             continue;
         } else if (a[i] & IS_CHAR_OPTION) {
             trace_log(LOG_DEBUG, "Got the char option '%s'", argv[i]);
-            /* TODO: o = handle_char_option(argv[i] + 1, o); */
+            o = handle_char_option(argv[i] + 1, o);
         } else if (a[i] & IS_STR_OPTION) {
             trace_log(LOG_DEBUG, "Got the string option '%s'", argv[i]);
-            /* TODO: o = handle_str_option(argv[i] + 2, o); */
+            o = handle_str_option(argv[i] + 2, o);
         }
     }
 
     if (o & INVALID_OPTION) {
         exitcode = EXIT_FAILURE;
-        fputs(usage, stdout);
+        fputs("Try 'cor --help' for more information.\n", stderr);
     } else if (o & (SHOW_HELP|INVALID_OPTION)) {
-        fputs(usage, stdout);
+        show_help(stdout);
         goto finish;
     } else if (o & SHOW_VERSION) {
         puts("cor-prerelease");

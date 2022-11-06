@@ -1,4 +1,4 @@
-#define LENGTH(x) (sizeof (x) / sizeof (x[0]))
+#define LENGTH(x) (int) (sizeof (x) / sizeof (x[0]))
 
 typedef enum {
     LOG_DEBUG = 0,
