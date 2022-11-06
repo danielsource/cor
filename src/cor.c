@@ -46,7 +46,8 @@ static const Option g_options[] = {
     {'v', "version",  SHOW_VERSION, "Display version information"},
 };
 
-void show_help(FILE *f) {
+static void
+show_help(FILE *f) {
     int i;
     fputs("Usage: cor [OPTION]... [--] [FILE]...\n"
             "Preview colors when outputting files in the terminal.\n"
@@ -64,7 +65,7 @@ void show_help(FILE *f) {
             "Program page: https://github.com/danielsource/cor\n", f);
 }
 
-ArgFlags
+static ArgFlags
 identify_arg(const char *arg) {
     size_t len = strnlen(arg, 3);
     if (len == 1 &&
@@ -83,7 +84,7 @@ identify_arg(const char *arg) {
     return IS_FILE;
 }
 
-OptionFlags
+static OptionFlags
 handle_char_option(char *options, OptionFlags o) {
     int i, j;
     bool valid;
@@ -106,7 +107,7 @@ handle_char_option(char *options, OptionFlags o) {
     return o;
 }
 
-OptionFlags
+static OptionFlags
 handle_str_option(char *option, OptionFlags o) {
     int i;
     bool valid;
@@ -126,7 +127,7 @@ handle_str_option(char *option, OptionFlags o) {
     return o;
 }
 
-bool
+static bool
 is_color_dark(RGB rgb) {
     float hsp; /* HSP Equation from https://alienryderflex.com/hsp.html */
     hsp = sqrtf(0.299f * (rgb.r * rgb.r) +
@@ -135,7 +136,7 @@ is_color_dark(RGB rgb) {
     return hsp > 127.5f;
 }
 
-void
+static void
 print_file(FILE *f, OptionFlags o) {
     int c;
     while ((c = fgetc(f)) != EOF) {
