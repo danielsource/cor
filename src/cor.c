@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -31,6 +32,12 @@ typedef struct {
     OptionFlags flag;
     char *description;
 } Option;
+
+typedef struct {
+    unsigned char r;
+    unsigned char g;
+    unsigned char b;
+} RGB;
 
 static const Option g_options[] = {
     {'c', "no-color", NO_COLOR,     "Disable color in output"},
@@ -92,8 +99,8 @@ handle_char_option(char *options, OptionFlags o) {
             }
         }
         if (!valid) {
-            fprintf(stderr, "cor: Invalid option '-%c'\n", options[i]);
-            o |= INVALID_OPTION;
+            trace_log(LOG_ERROR, "cor: Invalid option '-%c'", options[i]);
+            return INVALID_OPTION;
         }
     }
     return o;
@@ -113,14 +120,32 @@ handle_str_option(char *option, OptionFlags o) {
         }
     }
     if (!valid) {
-        fprintf(stderr, "cor: Invalid option '--%s'\n", option);
-        o |= INVALID_OPTION;
+        trace_log(LOG_ERROR, "cor: Invalid option '--%s'", option);
+        return INVALID_OPTION;
     }
     return o;
 }
 
+bool
+is_color_dark(RGB rgb) {
+    float hsp; /* HSP Equation from https://alienryderflex.com/hsp.html */
+    hsp = sqrtf(0.299f * (rgb.r * rgb.r) +
+            0.587f * (rgb.g * rgb.g) +
+            0.114f * (rgb.b * rgb.b));
+    return hsp > 127.5f;
+}
+
+void
+print_file(FILE *f, OptionFlags o) {
+    int c;
+    while ((c = fgetc(f)) != EOF) {
+        putchar(c);
+    }
+}
+
 int
 main(int argc, char **argv) {
+    FILE *f = NULL;
     ArgFlags *a;
     OptionFlags o = 0;
     char *no_color;
@@ -174,13 +199,21 @@ main(int argc, char **argv) {
                 "Reading stdin because no file was provided");
     else for (i = 1; i < argc; i++) {
         if (a[i] & (IS_OPTION_END |
-                IS_CHAR_OPTION | IS_STR_OPTION))
+                IS_CHAR_OPTION | IS_STR_OPTION)) {
             continue;
-        else if (a[i] & IS_STDIN)
+        } else if (a[i] & IS_STDIN) {
             trace_log(LOG_DEBUG, "Reading stdin");
-        else if (a[i] & IS_FILE)
+            f = stdin;
+        } else if (a[i] & IS_FILE) {
             trace_log(LOG_DEBUG, "Reading '%s'", argv[i]);
-        /* TODO: read files and print them */
+            f = fopen(argv[i], "r");
+        }
+        if (!f) {
+            trace_log(LOG_ERROR, "cor: %s:", argv[i]);
+            exitcode = EXIT_FAILURE;
+            continue;
+        }
+        print_file(f, o);
     }
 
 finish:

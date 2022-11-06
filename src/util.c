@@ -6,6 +6,7 @@
 
 #include "util.h"
 
+static FILE *g_log_file;
 static LogType g_log_level = LOG_INFO;
 
 void
@@ -32,8 +33,10 @@ set_trace_log_level(LogType t) {
 
 void
 trace_log(LogType t, const char *fmt, ...) {
-    FILE *f = stdout;
+    FILE *f = g_log_file;
     va_list args;
+    if (!g_log_file)
+        f = stderr;
     if (t < g_log_level)
         return;
     va_start(args, fmt);
@@ -56,7 +59,7 @@ trace_log(LogType t, const char *fmt, ...) {
     vfprintf(f, fmt, args);
     va_end(args);
     if (fmt[0] && fmt[strlen(fmt) - 1] == ':')
-        fprintf(f, " %s", strerror(errno));
+        fprintf(f, " %s\n", strerror(errno));
     else
         putchar('\n');
     fflush(f);
