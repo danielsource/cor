@@ -1,2 +1,2 @@
 cor: cor.c
-	c99 -o $@ $< -std=c99 -Wall -Wextra -Wpedantic
+	cc -o $@ $< -std=c89 -Wall -Wextra -Wpedantic
