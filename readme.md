@@ -4,7 +4,9 @@
 
 ## Build instructions
 
-    $ make
+  ```bash
+  make
+  ```
 
 ## How it works?
 
@@ -15,11 +17,15 @@ Using a terminal supporting ["true color"][tc], it is possible to use these [ANS
 
 In practice, this means that you can show the text 'TRUECOLOR' in orange in your terminal supporting "true color" this way:
 
-    $ printf '\033[38;2;255;100;0m%s\033[0m\n' TRUECOLOR
+  ```bash
+  printf '\033[38;2;255;100;0m%s\033[0m\n' TRUECOLOR
+  ```
 
 ## See also
 
--     $ cor --help
+- ```bash
+  cor --help
+  ```
 
 - [ap/vim-css-color][vim-plugin]: A Vim plugin to preview colors in source code while editing.
   - The inspiration for `cor` (which, by the way, means color in Portuguese)
